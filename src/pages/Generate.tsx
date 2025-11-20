@@ -2,7 +2,9 @@ import { useState, FormEvent, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { Sparkles, AlertCircle, Loader2, CheckCircle, Upload, X, Zap, Star, Smartphone, Package, Wand2 } from 'lucide-react';
+import { Sparkles, AlertCircle, Loader2, CheckCircle, Upload, X, Zap, Star, Smartphone, Package, Wand2, Camera as CameraIcon, Image as ImageIcon } from 'lucide-react';
+import { isNativePlatform, pickImageFromCamera, pickImageFromGallery } from '../utils/camera';
+import { hapticLight, hapticSuccess, hapticError, hapticMedium } from '../utils/haptics';
 
 const TOKEN_COST = 20;
 
@@ -39,15 +41,64 @@ export function Generate() {
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
         setError('Image size must be less than 10MB');
+        hapticError();
         return;
       }
       if (!file.type.startsWith('image/')) {
         setError('Please select a valid image file');
+        hapticError();
         return;
       }
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
       setError('');
+      hapticLight();
+    }
+  };
+
+  const handleNativeCamera = async () => {
+    try {
+      setError('');
+      const result = await pickImageFromCamera();
+
+      if (result.file.size > 10 * 1024 * 1024) {
+        setError('Image size must be less than 10MB');
+        hapticError();
+        return;
+      }
+
+      setImageFile(result.file);
+      setImagePreview(result.dataUrl);
+      hapticLight();
+    } catch (err: any) {
+      console.error('Camera error:', err);
+      if (err.message !== 'User cancelled photos app') {
+        setError('Failed to access camera. Please check permissions.');
+        hapticError();
+      }
+    }
+  };
+
+  const handleNativeGallery = async () => {
+    try {
+      setError('');
+      const result = await pickImageFromGallery();
+
+      if (result.file.size > 10 * 1024 * 1024) {
+        setError('Image size must be less than 10MB');
+        hapticError();
+        return;
+      }
+
+      setImageFile(result.file);
+      setImagePreview(result.dataUrl);
+      hapticLight();
+    } catch (err: any) {
+      console.error('Gallery error:', err);
+      if (err.message !== 'User cancelled photos app') {
+        setError('Failed to access gallery. Please check permissions.');
+        hapticError();
+      }
     }
   };
 
@@ -89,20 +140,24 @@ export function Generate() {
 
     if (!hasEnoughTokens) {
       setError(`Insufficient tokens. You need ${TOKEN_COST} tokens for video generation.`);
+      hapticError();
       return;
     }
 
     if (!imageFile) {
       setError('Please upload an image');
+      hapticError();
       return;
     }
 
     if (prompt.trim().length < 3) {
       setError('Please enter a more detailed prompt (at least 3 characters)');
+      hapticError();
       return;
     }
 
     setLoading(true);
+    hapticMedium();
 
     try {
       const jobId = generateJobId();
@@ -179,6 +234,7 @@ export function Generate() {
       }
 
       setSuccess(true);
+      hapticSuccess();
       setPrompt('');
       setNotes('');
       setVideoType('performance');
@@ -187,6 +243,7 @@ export function Generate() {
       setTimeout(() => setSuccess(false), 5000);
     } catch (err: any) {
       setError(err.message || 'Failed to create generation');
+      hapticError();
       console.error('Generation error:', err);
     } finally {
       setLoading(false);
@@ -210,22 +267,45 @@ export function Generate() {
                 Upload Image <span className="text-red-500">*</span>
               </label>
               {!imagePreview ? (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition"
-                >
-                  <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-700 mb-2 font-medium">Click to upload an image</p>
-                  <p className="text-sm text-gray-500">PNG, JPG, WEBP, GIF up to 10MB</p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="hidden"
-                    required
-                  />
-                </div>
+                <>
+                  {isNativePlatform() ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        onClick={handleNativeCamera}
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition"
+                      >
+                        <CameraIcon className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+                        <p className="text-sm font-medium text-gray-700">Take Photo</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNativeGallery}
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition"
+                      >
+                        <ImageIcon className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+                        <p className="text-sm font-medium text-gray-700">Choose from Gallery</p>
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition"
+                    >
+                      <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-lg text-gray-700 mb-2 font-medium">Click to upload an image</p>
+                      <p className="text-sm text-gray-500">PNG, JPG, WEBP, GIF up to 10MB</p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                        required
+                      />
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="relative">
                   <img

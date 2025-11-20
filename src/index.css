@@ -1,3 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --color-canvas: #f8fafc;
+    --color-surface: #ffffff;
+    --color-border: #e2e8f0;
+    --color-muted: #475569;
+    --color-ink: #0f172a;
+    --radius-lg: 1.25rem;
+    --radius-xl: 1.75rem;
+  }
+
+  .dark {
+    --color-canvas: #020617;
+    --color-surface: #0f172a;
+    --color-border: #1e293b;
+    --color-muted: #94a3b8;
+    --color-ink: #f8fafc;
+  }
+
+  html {
+    font-family: 'Space Grotesk', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  body {
+    @apply bg-brand-canvas text-brand-ink antialiased;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* Mobile viewport adjustments */
+  @supports (-webkit-touch-callout: none) {
+    body {
+      min-height: -webkit-fill-available;
+    }
+  }
+}

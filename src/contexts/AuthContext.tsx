@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { initializePushNotifications } from '../utils/pushNotifications';
+import { initializeIAP } from '../utils/iap';
 
 interface Profile {
   id: string;
@@ -78,6 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           const profileData = await fetchProfile(session.user.id);
           setProfile(profileData);
+
+          // Initialize native features on login
+          try {
+            await initializePushNotifications(session.user.id);
+            await initializeIAP(session.user.id);
+          } catch (error) {
+            console.error('Failed to initialize native features:', error);
+          }
         } else {
           setProfile(null);
         }

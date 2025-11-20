@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { Coins, TrendingUp, TrendingDown, Calendar, FileText } from 'lucide-react';
+import { Coins, TrendingUp, TrendingDown, Calendar, FileText, Sparkles, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { isNativeIAP, purchaseTokenPackage, TOKEN_PACKAGES } from '../utils/iap';
 
 interface TokenTransaction {
   id: string;
@@ -14,9 +15,12 @@ interface TokenTransaction {
 }
 
 export function Tokens() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [transactions, setTransactions] = useState<TokenTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+  const [purchaseError, setPurchaseError] = useState('');
 
   useEffect(() => {
     if (profile) {
@@ -42,7 +46,7 @@ export function Tokens() {
     }
   };
 
-  const getTransactionIcon = (type: TokenTransaction['type'], amount: number) => {
+  const getTransactionIcon = (amount: number) => {
     if (amount > 0) {
       return <TrendingUp className="w-5 h-5 text-green-600" />;
     }
@@ -54,6 +58,35 @@ export function Tokens() {
       return 'text-green-600';
     }
     return 'text-red-600';
+  };
+
+  const handlePurchase = async (packageId: string) => {
+    if (!profile) return;
+
+    setPurchasing(packageId);
+    setPurchaseError('');
+    setPurchaseSuccess(false);
+
+    try {
+      const result = await purchaseTokenPackage(packageId, profile.id);
+
+      if (result.success) {
+        setPurchaseSuccess(true);
+        await refreshProfile();
+        await fetchTransactions();
+
+        setTimeout(() => setPurchaseSuccess(false), 5000);
+      } else {
+        if (result.error !== 'Purchase cancelled') {
+          setPurchaseError(result.error || 'Purchase failed');
+        }
+      }
+    } catch (error: any) {
+      console.error('Purchase error:', error);
+      setPurchaseError(error.message || 'Purchase failed');
+    } finally {
+      setPurchasing(null);
+    }
   };
 
   return (
@@ -116,7 +149,7 @@ export function Tokens() {
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                      {getTransactionIcon(transaction.type, transaction.amount)}
+                      {getTransactionIcon(transaction.amount)}
                     </div>
                     <div>
                       <div className="font-medium text-gray-900">{transaction.description}</div>
@@ -140,10 +173,70 @@ export function Tokens() {
           )}
         </div>
 
+        {isNativeIAP() && (
+          <div className="mt-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Tokens</h2>
+              <p className="text-gray-600">Buy token packages directly through Apple In-App Purchase</p>
+            </div>
+
+            {purchaseSuccess && (
+              <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-start gap-2">
+                <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <div className="font-semibold">Purchase successful!</div>
+                  <div>Your tokens have been added to your account.</div>
+                </div>
+              </div>
+            )}
+
+            {purchaseError && (
+              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <span className="text-sm">{purchaseError}</span>
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              {TOKEN_PACKAGES.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className="bg-white rounded-xl border-2 border-gray-200 p-6 hover:border-blue-400 hover:shadow-lg transition"
+                >
+                  <div className="text-center mb-4">
+                    <Sparkles className="w-10 h-10 text-blue-600 mx-auto mb-3" />
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{pkg.tokens}</div>
+                    <div className="text-sm text-gray-500 mb-3">{pkg.name}</div>
+                    <div className="text-3xl font-bold text-blue-600">{pkg.price}</div>
+                    <div className="text-xs text-gray-500 mt-1">{pkg.description}</div>
+                  </div>
+                  <button
+                    onClick={() => handlePurchase(pkg.id)}
+                    disabled={purchasing !== null}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {purchasing === pkg.id ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      'Purchase'
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="mt-8 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-100">
           <h3 className="text-lg font-bold text-gray-900 mb-2">Need more tokens?</h3>
           <p className="text-gray-600 mb-4">
-            Upgrade your subscription to get more tokens every month and unlock premium features.
+            {isNativeIAP()
+              ? 'Purchase token packages above, or upgrade your subscription for recurring tokens.'
+              : 'Upgrade your subscription to get more tokens every month and unlock premium features.'
+            }
           </p>
           <a
             href="/dashboard/subscription"

@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { ThemeToggle } from './ThemeToggle';
 import {
   Sparkles,
   LayoutDashboard,
@@ -45,7 +46,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </Link>
         </div>
 
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 space-y-4">
           <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">Token Balance</span>
@@ -58,6 +59,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               {profile?.subscription_tier?.toUpperCase() || 'FREE'} Plan
             </div>
           </div>
+          <ThemeToggle className="w-full justify-center text-xs" />
         </div>
 
         <nav className="flex-1 p-4 space-y-1">

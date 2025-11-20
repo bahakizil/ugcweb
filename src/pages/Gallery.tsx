@@ -11,9 +11,12 @@ import {
   Loader2,
   Download,
   Trash2,
-  Filter,
   Search,
+  Share2,
 } from 'lucide-react';
+import { Share } from '@capacitor/share';
+import { Capacitor } from '@capacitor/core';
+import { hapticLight, hapticSuccess, hapticError } from '../utils/haptics';
 
 interface Generation {
   id: string;
@@ -77,6 +80,7 @@ export function Gallery() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this generation?')) return;
 
+    hapticLight();
     try {
       const { error } = await supabase
         .from('generations')
@@ -87,14 +91,58 @@ export function Gallery() {
       if (error) {
         console.error('Delete error:', error);
         alert('Failed to delete generation. Please try again.');
+        hapticError();
         return;
       }
 
       setGenerations(generations.filter((g) => g.id !== id));
       setSelectedGeneration(null);
+      hapticSuccess();
     } catch (error) {
       console.error('Error deleting generation:', error);
       alert('Failed to delete generation. Please try again.');
+      hapticError();
+    }
+  };
+
+  const handleShare = async (generation: Generation) => {
+    if (!generation.result_url) {
+      alert('No file to share');
+      return;
+    }
+
+    hapticLight();
+
+    if (!Capacitor.isNativePlatform()) {
+      // Web fallback: copy link to clipboard
+      try {
+        await navigator.clipboard.writeText(generation.result_url);
+        alert('Link copied to clipboard!');
+        hapticSuccess();
+      } catch (error) {
+        console.error('Failed to copy link:', error);
+        alert('Failed to copy link');
+        hapticError();
+      }
+      return;
+    }
+
+    // Native share
+    try {
+      await Share.share({
+        title: 'AI Generated Content',
+        text: `Check out this AI-generated ${generation.type}: ${generation.prompt.substring(0, 100)}`,
+        url: generation.result_url,
+        dialogTitle: 'Share your creation',
+      });
+      hapticSuccess();
+    } catch (error: any) {
+      // User cancelled or error occurred
+      if (error.message && !error.message.includes('cancel')) {
+        console.error('Share error:', error);
+        alert('Failed to share');
+        hapticError();
+      }
     }
   };
 
@@ -285,15 +333,24 @@ export function Gallery() {
                   </div>
                   <div className="flex items-center gap-2">
                     {selectedGeneration.status === 'completed' && selectedGeneration.result_url && (
-                      <a
-                        href={selectedGeneration.result_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        title="Download"
-                      >
-                        <Download className="w-5 h-5" />
-                      </a>
+                      <>
+                        <button
+                          onClick={() => handleShare(selectedGeneration)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+                          title="Share"
+                        >
+                          <Share2 className="w-5 h-5" />
+                        </button>
+                        <a
+                          href={selectedGeneration.result_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                          title="Download"
+                        >
+                          <Download className="w-5 h-5" />
+                        </a>
+                      </>
                     )}
                     <button
                       onClick={() => handleDelete(selectedGeneration.id)}
